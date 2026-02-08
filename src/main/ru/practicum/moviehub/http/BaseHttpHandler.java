@@ -1,7 +1,30 @@
 package ru.practicum.moviehub.http;
-
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
-public abstract class BaseHttpHandler implements HttpHandler {
+abstract class BaseHttpHandler implements HttpHandler {
+	protected static final String CT_JSON = "application/json; charset=UTF-8";  // !!! Укажите содержимое заголовка Content-Type
 
+	protected void sendJson(HttpExchange ex, int status, String json) throws IOException {
+		ex.getResponseHeaders().set("Content-Type", CT_JSON);
+		System.out.println("Sending JSON: " + json); // Логирование для отладки
+		System.out.println("JSON length: " + json.length()); // Проверка длины JSON
+		ex.sendResponseHeaders(status, -1);
+		try (OutputStream os = ex.getResponseBody()) {
+			os.write(json.getBytes(StandardCharsets.UTF_8));
+			os.flush(); // Убедиться, что все данные отправлены
+		}
+		ex.close(); // Закрыть соединение
+	}
+
+	protected void sendNoContent(HttpExchange ex) throws java.io.IOException {
+		// !!! Реализуйте общий для всех хендлеров метод
+		// для отправки ответа без тела и кодом 204
+		ex.getResponseHeaders().set("Content-Type", CT_JSON);
+
+		ex.sendResponseHeaders(204, -1);
+	}
 }
