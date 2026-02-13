@@ -8,6 +8,7 @@ import ru.practicum.moviehub.model.Movie;
 import ru.practicum.moviehub.store.MoviesStore;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 
@@ -29,98 +30,75 @@ public class MoviesHandler extends BaseHttpHandler {
 				"тип содержимого. Ожидаемый тип: application/json"};
 		String path = ex.getRequestURI().getPath();
 
-
-
-		if (!isValidContentType(contentType, details)) {
-			ErrorHandler.requestHeaderError(ex, "Получен запрос с неправильным значением Content-Type", details);
-			return;
-		}
-		String requestBody = new String(ex.getRequestBody().readAllBytes());
-		System.out.println("Полученное тело запроса: " + requestBody);
-		System.out.println("Начало проверки isValidJson");
-		if (!isValidJson(requestBody)) {
-			ErrorHandler.validationError(ex, "Некорректный формат JSON", details);
-		}
-		System.out.println("Проверка isValidJson пройдена");
 		if (method.equalsIgnoreCase("GET")) {
-			System.out.println("Перешли в логику GET");
-			System.out.println("Полученный путь: " + path);
+
 			if (path.equals("/movies")) {
-				System.out.println("Обрабатываем запрос для /movies");
-				List<Movie> movies = moviesStore.getAllMovies();
-				System.out.println("Список фильмов после получения: " + movies);
-				System.out.println("Список фильмов перед конвертацией в JSON: " + movies.toString());
-				String jsonMovies = convertMoviesToJson(movies);
-				System.out.println(jsonMovies);
+				String query = ex.getRequestURI().getQuery();
+				if (query != null && query.startsWith("year=")) {
+					try {
+						String yearStr = query.split("=")[1];
+						int year = Integer.parseInt(yearStr);
+						List<Movie> moviesByYear = moviesStore.getMoviesByYear(year);
 
-				sendJson(ex, 200, jsonMovies);
-
-			} else if (path.contains("/movies/")) {
-				List<Movie> movies = moviesStore.getAllMovies();
-				System.out.println("Список фильмов после получения: " + movies);
-				System.out.println("Обрабатываем запрос для /movies/");
-				String idStr = path.substring(path.indexOf("/movies/") + "/movies/".length());
-				System.out.println("Разобрали посимвольно /movies и переходим к try");
-				try {
-					System.out.println("Парсим id");
-					int id = Integer.parseInt(idStr);
-					System.out.println("Идентификатор: " + id);
-					System.out.println("Список фильмов " + moviesStore.getAllMovies());
-					System.out.println("Использование findMovieById");
-					Movie movie = moviesStore.findMovieById(id);
-					System.out.println("Найденый фильм: " + movie);
-
-					if (movie == null) {
-						System.out.println("Проверка на null");
-						ErrorHandler.notFoundParameterError(ex, "Фильм не найден", details);
-						System.out.println("Прошла обработка null");
+						if (year < 1888 || year > 2026) {
+							sendJson(ex, 200, "[]");
+							return;
+						}
+						sendJson(ex, 200, convertMoviesToJson(moviesByYear));
 						return;
+					} catch (NumberFormatException e) {
+						ErrorHandler.movieIdNotNumber(ex, "Некорректный параметр запроса 'year'", details);
+						return;
+					}
+				}
+				List<Movie> movies = moviesStore.getAllMovies();
+				sendJson(ex, 200, convertMoviesToJson(movies));
+
+			} else if (path.matches("/movies/\\d+")) {
+
+				String idStr = path.substring(path.indexOf("/movies/") + "/movies/".length());
+				try {
+					int id = Integer.parseInt(idStr);
+					Movie movie = moviesStore.findMovieById(id);
+					if (movie == null) {
+						ErrorHandler.notFoundParameterError(ex, "Фильм не найден", details);
 					} else {
 						String movieJson = gson.toJson(movie);
 						sendJson(ex, 200, movieJson);
 					}
 				} catch (NumberFormatException e) {
-					ErrorHandler.movieIdNot_Number(ex, "Некорректный формат ID", details);
+					ErrorHandler.movieIdNotNumber(ex, "Некорректный формат ID", details);
+					return;
 				}
-			} else if (path.contains("/movies/?year=")) {
-
-
-				String query = ex.getRequestURI().getQuery();
-				if (query != null && query.contains("year=")) {
-					String yearStr = query.split("=")[1];
-					try {
-						int year = Integer.parseInt(yearStr);
-						List<Movie> moviesByYear = moviesStore.getMoviesByYear(year);
-						if (moviesByYear.isEmpty()) {
-							ErrorHandler.notFoundParameterError(ex, "Фильмы за указанный год не найдены", details);
-						} else {
-							String movieByYearToJson = convertMoviesToJson(moviesByYear);
-							sendJson(ex, 200, movieByYearToJson);
-						}
-					} catch (NumberFormatException e) {
-						ErrorHandler.movieIdNot_Number(ex, "Некорректный параметр запроса - 'year'", details);
-					}
-				} else {
-
-				}
+			} else if (path.startsWith("/movies/")) {
+				ErrorHandler.movieIdNotNumber(ex, "Некорректный формат ID", details);
+				return;
+			} else {
+				ErrorHandler.notFoundParameterError(ex, "Эндпоинт не найден", details);
+				return;
 			}
-		} else if (method.equalsIgnoreCase("POST")) {
-			System.out.println("Метод запроса - POST");
 
+		} else if (method.equalsIgnoreCase("POST")) {
+
+			if (!isValidContentType(contentType, details)) {
+				ErrorHandler.requestHeaderError(ex, "Получен запрос с неправильным значением Content-Type",
+						details);
+				return;
+			}
+			String requestBody = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			if (!isValidJson(requestBody)) {
+				ErrorHandler.validationError(ex, "Некорректный формат JSON", details);
+				return;
+			}
 			Movie newMovie = gson.fromJson(requestBody, Movie.class);
-			System.out.println("newMovie после десериализации: " + newMovie);
-			System.out.println("Проверка validateMovie");
 			if (!validateMovie(newMovie, details)) {
 				ErrorHandler.validationError(ex, "Ошибка валидации", details);
 				return;
 			}
-			System.out.println("Проверка validateMovie прошла");
 			newMovie.setId(generateUniqueId());
 			moviesStore.addMovie(newMovie);
 			String responseJson = gson.toJson(newMovie);
-			System.out.println("Проверка sendJson");
 			sendJson(ex, 201, responseJson);
-
 
 		} else if (method.equalsIgnoreCase("DELETE")) {
 			if (path.contains("/movies/")) {
@@ -129,18 +107,20 @@ public class MoviesHandler extends BaseHttpHandler {
 					int id = Integer.parseInt(idStr);
 					Movie movie = moviesStore.findMovieById(id);
 					if (movie == null) {
-						ErrorHandler.notFoundParameterError(ex, "Ошибка при поиске фильма по ID", details);
+						ErrorHandler.notFoundParameterError(ex, "Фильм по указанному ID не найден", details);
+						return;
 					} else {
 						moviesStore.removeMovieById(id);
-						sendJson(ex, 204, "");
+						ex.sendResponseHeaders(204, -1);
+						ex.close();
 					}
 				} catch (NumberFormatException e) {
-					ErrorHandler.movieIdNot_Number(ex, "Некорректный формат ID", details);
+					ErrorHandler.movieIdNotNumber(ex, "Некорректный формат ID", details);
+					return;
 				}
 			}
 		}
 	}
-
 
 
 	private int generateUniqueId() {
@@ -148,11 +128,7 @@ public class MoviesHandler extends BaseHttpHandler {
 	}
 
 	private String convertMoviesToJson(List<Movie> movies) {
-		System.out.println("Лист movies при входе в метод convertMoviesToJson: " + movies.toString());
-		Gson gson = new GsonBuilder()
-				.serializeNulls()
-				.create();
-		System.out.println("В методе convertMoviesToJson перед отправлением: " + gson.toJson(movies));
+
 		return gson.toJson(movies);
 	}
 
@@ -161,22 +137,22 @@ public class MoviesHandler extends BaseHttpHandler {
 
 		if (movie.title == null || movie.title.isEmpty() || movie.title.length() > 100) {
 			isValid = false;
-		} else if (movie.year < 1888 || movie.year > 2027) {
+			details[0] = "Фильм с указанным названием не найден";
+		} else if (movie.year < 1888 || movie.year > 2026) {
 			isValid = false;
+			details[0] = "Указан некорректный год фильма";
 		}
 		return isValid;
 	}
 
 	private boolean isValidContentType(String contentType, String[] details) {
-		System.out.println("Проверка содержимого заголовка в методе isValidContentType началась");
+
 		if (contentType == null || contentType.isEmpty()) {
-			details[2] = "Отсутствует заголовок Content-Type. Ожидаемый тип: application/json";
-			System.out.println("Заголовок Content-Type пуст или отсутствует. Возвращается false");
+			details[0] = "Отсутствует заголовок Content-Type";
 			return false;
 		}
 		if (!"application/json; charset=UTF-8".equalsIgnoreCase(contentType)) {
-			details[2] = "Неподдерживаемый тип содержимого. Ожидаемый тип: application/json";
-			System.out.println("Проверка не прошла. Возвращается false");
+			details[0] = "Неподдерживаемый тип содержимого";
 			return false;
 		}
 		return true;
@@ -187,11 +163,9 @@ public class MoviesHandler extends BaseHttpHandler {
 			gson.fromJson(json, Object.class);
 			return true;
 		} catch (JsonSyntaxException e) {
-
 			return false;
 		}
 	}
-
 }
 
 

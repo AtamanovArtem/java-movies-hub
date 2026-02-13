@@ -15,7 +15,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,12 +23,17 @@ import static org.junit.jupiter.api.Assertions.*;
 public class MoviesApiTest {
 	private static final String BASE = "http://localhost:8080";
 	private static MoviesServer server;
+	private static MoviesStore moviesStore;
 	private static HttpClient client;
 	private static boolean serverStarted = false;
 
+	public MoviesApiTest() throws IOException, InterruptedException {
+	}
+
 	@BeforeAll
 	static void beforeAll() {
-		server = new MoviesServer(new MoviesStore(), 8080);
+		moviesStore = new MoviesStore();
+		server = new MoviesServer(moviesStore, 8080);
 		server.start();
 		serverStarted = true;
 		client = HttpClient.newBuilder()
@@ -46,7 +50,7 @@ public class MoviesApiTest {
 	}
 
 	@Test
-	void getMovies_whenEmpty_returnsEmptyArray() throws Exception {
+	void getMoviesWhenEmptyReturnsEmptyArray() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(BASE + "/movies"))
 				.GET()
@@ -63,8 +67,9 @@ public class MoviesApiTest {
 		assertEquals("application/json; charset=UTF-8", contentTypeHeaderValue,
 				"Content-Type должен содержать формат данных и кодировку");
 
+		System.out.println("Body before trim: " + resp.body());
 		String body = resp.body().trim();
-		System.out.println("Body: " + resp.body());
+		System.out.println("Body after trim: " + body);
 		assertEquals("[]", body, "Ответ должен быть пустым массивом JSON");
 	}
 
@@ -75,7 +80,6 @@ public class MoviesApiTest {
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(BASE + "/movies/2"))
 				.GET()
-				.header("Content-Type", "application/json; charset=UTF-8")
 				.build();
 		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 		assertEquals(404, resp.statusCode(), "GET /movies/id должен вернуть 404 если фильм не найден");
@@ -83,55 +87,35 @@ public class MoviesApiTest {
 
 	@Test
 	void getMoviesIdMovieFound() throws IOException, InterruptedException {
-		MoviesStore moviesStore = new MoviesStore();
-		MoviesHandler moviesHandler = new MoviesHandler(moviesStore);
 
 		Movie movie1 = new Movie("Название фильма 1", 2020, 1);
 		Movie movie2 = new Movie("Название фильма 2", 2021, 2);
 		moviesStore.addMovie(movie1);
 		moviesStore.addMovie(movie2);
 
-		System.out.println("список фильмов после добавления в тесте: " + moviesStore.movies);
-
-		// Сериализация и десериализация списка фильмов
 		Gson gson = new GsonBuilder()
 				.serializeNulls()
 				.create();
 		String moviesArrayJson = gson.toJson(moviesStore.movies);
 		List<Movie> movies = gson.fromJson(moviesArrayJson, new ListOfMoviesTypeToken().getType());
-		System.out.println("список фильмов после десериализации: " + movies);
 
-		// Поиск фильма по идентификатору в десериализованном списке
-		Movie foundMovie = null;
-		for (Movie movie : movies) {
-			if (movie.id == 2) {
-				foundMovie = movie;
-				break;
-			}
-		}
-		assertNotNull(foundMovie, "Фильм с id = 2 должен быть найден в десериализованном списке");
-
+		assertNotNull(moviesStore.findMovieById(2), "Фильм с id = 2 должен быть найден в списке");
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(BASE + "/movies/2"))
 				.GET()
-				.header("Content-Type", "application/json; charset=UTF-8")
 				.build();
 
-		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-		assertEquals(200, resp.statusCode(), "GET /movies/id должен вернуть 200 если фильм найден");
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		assertEquals(200, response.statusCode(), "GET /movies/id должен вернуть 200 если фильм найден");
 	}
 
 
 	@Test
 	void getMoviesArray() throws Exception {
-		MoviesStore moviesStore = new MoviesStore();
-		MoviesHandler moviesHandler = new MoviesHandler(moviesStore);
-
-		Movie movie1 = new Movie("Название фильма 1", 1, 2020);
-		Movie movie2 = new Movie("Название фильма 2", 2, 2021);
+		Movie movie1 = new Movie("Название фильма 1", 2020, 1);
+		Movie movie2 = new Movie("Название фильма 2", 2021, 2);
 		moviesStore.addMovie(movie1);
 		moviesStore.addMovie(movie2);
-		System.out.println("Список фильмов после добавления: " + moviesStore.movies);//а тут список фильмов полный
 
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(BASE + "/movies"))
@@ -164,6 +148,24 @@ public class MoviesApiTest {
 			}
 		}
 	}
+
+	@Test
+	void getMoviesIdErrorWhenIdIsNotNumber() throws Exception {
+
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies/abc")) 
+				.GET()
+				.build();
+		HttpResponse<String> response = client.send(
+				request,
+				HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+		);
+
+		assertEquals(400, response.statusCode(),
+				"GET /movies/{id} должен вернуть 400, если id не является числом");
+
+	}
+
 
 	@Test
 	void postMovies_whenSuccessfullyAdded() throws IOException, InterruptedException {
@@ -238,9 +240,100 @@ public class MoviesApiTest {
 		assertEquals(415, resp.statusCode(), "POST /movies должен вернуть 415");
 	}
 
+	@Test
+	void deleteMoviesId() throws IOException, InterruptedException {
+		Movie movie = new Movie("Название фильма", 2020, 1);
+		moviesStore.addMovie(movie);
 
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies/" + movie.getId()))
+				.DELETE()
+				.build();
 
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		assertEquals(204, response.statusCode(), "DELETE /movies/id должен вернуть 204 если фильм удалён");
 
+		assertNull(moviesStore.findMovieById(movie.getId()), "Фильм должен быть удалён из хранилища");
+	}
 
+	@Test
+	void deleteNonExistentMovie() throws IOException, InterruptedException {
+		long nonExistentId = 154; // заведомо несуществующий ID
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies/" + nonExistentId))
+				.DELETE()
+				.build();
+
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		assertEquals(404, response.statusCode(), "DELETE /movies/id должен вернуть 404 если фильм не найден");
+	}
+
+	@Test
+	void deleteWithInvalidId() throws IOException, InterruptedException {
+		String invalidId = "abc";
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies/" + invalidId))
+				.DELETE()
+				.build();
+
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+		assertEquals(400, response.statusCode(), "DELETE /movies/id должен вернуть 400 если id не является числом");
+	}
+
+	@Test
+	void getMoviesByYearExistingYear() throws IOException, InterruptedException {
+		Movie movie1 = new Movie("Название фильма 1", 2020, 1);
+		Movie movie2 = new Movie("Название фильма 2", 2021, 2);
+		moviesStore.addMovie(movie1);
+		moviesStore.addMovie(movie2);
+		int existingYear = 2020;
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies?year=" + existingYear))
+				.GET()
+				.build();
+
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		assertEquals(200, response.statusCode(), "GET /movies?year должен вернуть 200 для существующего года");
+		assertTrue(response.body().contains("["));
+	}
+
+	@Test
+	void getMoviesByYearNonExistentYear() throws IOException, InterruptedException {
+		int nonExistentYear = 9999;
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies?year=" + nonExistentYear))
+				.GET()
+				.build();
+
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		assertEquals(200, response.statusCode(), "GET /movies?year должен вернуть 200 даже для несуществующего года");
+		assertTrue(response.body().contains("[]"));
+	}
+
+	@Test
+	void getMoviesByYearInvalidYear() throws IOException, InterruptedException {
+		String invalidYear = "abc";
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(BASE + "/movies?year=" + invalidYear))
+				.GET()
+				.build();
+
+		HttpResponse<String> response = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		assertEquals(400, response.statusCode(), "GET /movies?year должен вернуть 400 для некорректного значения года");
+	}
 
 }
+
+
+
+
+
+
+
+

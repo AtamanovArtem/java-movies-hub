@@ -17,11 +17,10 @@ public class ErrorHandler {
 		ErrorResponse errorResponse = new ErrorResponse(errorMessage, details);
 		Gson gson = new Gson();
 		String jsonResponse = gson.toJson(errorResponse);
+		byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
 		exchange.sendResponseHeaders(422, -1);
 		try (OutputStream os = exchange.getResponseBody()) {
-			os.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
-		} catch (IOException e) {
-			e.printStackTrace();
+			os.write(responseBytes);
 		}
 	}
 
@@ -34,13 +33,10 @@ public class ErrorHandler {
 
 		Gson gson = gsonBuilder.create();
 		String jsonResponse = gson.toJson(errorResponse);
-		System.out.println(jsonResponse);
-		System.out.println(jsonResponse.length());
+		byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
 		exchange.sendResponseHeaders(415, -1);
 		try (OutputStream os = exchange.getResponseBody()) {
-			os.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
-		} catch (IOException e) {
-			e.printStackTrace();
+			os.write(responseBytes);
 		}
 	}
 
@@ -50,36 +46,24 @@ public class ErrorHandler {
 		ErrorResponse errorResponse = new ErrorResponse(errorMessage, details);
 		Gson gson = new Gson();
 		String jsonResponse = gson.toJson(errorResponse);
-
-		System.out.println("Передача ответа от сервера: 404");
+		byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
 		exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
 		exchange.sendResponseHeaders(404, -1);
 
-
-		System.out.println("Передача ответа от сервера произошла");
-		System.out.println("Начало записи в выходной поток");
-		System.out.println("JSON response: " + jsonResponse);
 		try (OutputStream os = exchange.getResponseBody()) {
-			os.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
-		} catch (IOException e) {
-			e.printStackTrace();
+			os.write(responseBytes);
 		}
-		System.out.println("запись в выходной поток произошла");
 	}
 
-	public static void movieIdNot_Number (HttpExchange exchange, String errorMessage, String[] details) throws
-			IOException {
+	public static void movieIdNotNumber(HttpExchange exchange, String errorMessage, String[] details) throws
+			IOException { //Поправленный
 		ErrorResponse errorResponse = new ErrorResponse(errorMessage, details);
 		Gson gson = new Gson();
 		String jsonResponse = gson.toJson(errorResponse);
+		byte[] responseBytes = jsonResponse.getBytes(StandardCharsets.UTF_8);
 		exchange.sendResponseHeaders(400, -1);
-		details[4] = "Некорректный параметр";
 		try (OutputStream os = exchange.getResponseBody()) {
-			os.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
-		} catch (IOException e) {
-			e.printStackTrace();
+			os.write(responseBytes);
 		}
 	}
-
-
 }

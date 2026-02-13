@@ -22,7 +22,6 @@ public class MoviesStore {
 	// Поиск фильма по идентификатору
 	public Movie findMovieById(int id) {
 		for (Movie movie : movies) {
-			System.out.println("Проверяем фильм: " + movie.getId());
 			if (movie.getId() == id) {
 				return movie;
 			}
