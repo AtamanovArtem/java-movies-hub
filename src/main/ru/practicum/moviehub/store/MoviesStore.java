@@ -1,6 +1,5 @@
 package ru.practicum.moviehub.store;
 
-import org.junit.jupiter.api.BeforeEach;
 import ru.practicum.moviehub.model.Movie;
 
 import java.util.ArrayList;
@@ -42,7 +41,7 @@ public class MoviesStore {
 	public List<Movie> getAllMovies() {
 		return movies;
 	}
-	
+
 	public void clear() {
 		movies.clear();
 	}
