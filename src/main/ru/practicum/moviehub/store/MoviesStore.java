@@ -39,13 +39,10 @@ public class MoviesStore {
 		return false;
 	}
 
-
 	public List<Movie> getAllMovies() {
 		return movies;
 	}
-
-
-	@BeforeEach
+	
 	public void clear() {
 		movies.clear();
 	}

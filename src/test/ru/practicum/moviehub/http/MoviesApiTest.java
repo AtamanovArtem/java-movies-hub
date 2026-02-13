@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.practicum.moviehub.model.Movie;
 import ru.practicum.moviehub.store.MoviesStore;
@@ -47,6 +48,11 @@ public class MoviesApiTest {
 			server.stop();
 			serverStarted = false;
 		}
+	}
+
+	@BeforeEach
+	void beforeEach() {
+		moviesStore.clear();
 	}
 
 	@Test
