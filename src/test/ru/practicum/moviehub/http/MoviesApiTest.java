@@ -153,7 +153,7 @@ public class MoviesApiTest {
 	void getMoviesIdErrorWhenIdIsNotNumber() throws Exception {
 
 		HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(BASE + "/movies/abc")) 
+				.uri(URI.create(BASE + "/movies/abc"))
 				.GET()
 				.build();
 		HttpResponse<String> response = client.send(
