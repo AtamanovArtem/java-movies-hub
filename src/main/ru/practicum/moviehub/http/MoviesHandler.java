@@ -13,9 +13,9 @@ import java.util.List;
 
 
 public class MoviesHandler extends BaseHttpHandler {
-	public MoviesStore moviesStore;
-	public Gson gson;
-	private int nextId = 1;
+	protected MoviesStore moviesStore;
+	protected Gson gson;
+	protected int nextId = 1;
 
 	public MoviesHandler(MoviesStore moviesStore) {
 		this.moviesStore = moviesStore;
@@ -135,10 +135,10 @@ public class MoviesHandler extends BaseHttpHandler {
 	private boolean validateMovie(Movie movie, String[] details) {
 		boolean isValid = true;
 
-		if (movie.title == null || movie.title.isEmpty() || movie.title.length() > 100) {
+		if (movie.getTitle() == null || movie.getTitle().isEmpty() || movie.getTitle().length() > 100) {
 			isValid = false;
 			details[0] = "Фильм с указанным названием не найден";
-		} else if (movie.year < 1888 || movie.year > 2026) {
+		} else if (movie.getYear() < 1888 || movie.getYear() > 2026) {
 			isValid = false;
 			details[0] = "Указан некорректный год фильма";
 		}

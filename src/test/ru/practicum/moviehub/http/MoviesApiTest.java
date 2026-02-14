@@ -102,7 +102,7 @@ public class MoviesApiTest {
 		Gson gson = new GsonBuilder()
 				.serializeNulls()
 				.create();
-		String moviesArrayJson = gson.toJson(moviesStore.movies);
+		String moviesArrayJson = gson.toJson(moviesStore.getAllMovies());
 		List<Movie> movies = gson.fromJson(moviesArrayJson, new ListOfMoviesTypeToken().getType());
 
 		assertNotNull(moviesStore.findMovieById(2), "Фильм с id = 2 должен быть найден в списке");
@@ -135,7 +135,7 @@ public class MoviesApiTest {
 		Gson gson = new GsonBuilder()
 				.serializeNulls()
 				.create();
-		String moviesArrayJson = gson.toJson(moviesStore.movies);
+		String moviesArrayJson = gson.toJson(moviesStore.getAllMovies());
 		List<Movie> movies = gson.fromJson(moviesArrayJson, new ListOfMoviesTypeToken().getType());
 
 		assertEquals(2, movies.size(), "Список фильмов должен содержать 2 элемента");

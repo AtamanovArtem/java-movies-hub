@@ -7,7 +7,7 @@ import java.util.List;
 
 public class MoviesStore {
 
-	public List<Movie> movies;
+	protected List<Movie> movies;
 
 	public MoviesStore() {
 		movies = new ArrayList<>();
